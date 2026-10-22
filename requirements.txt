@@ -1,0 +1,5 @@
+# tiki_crawler.py needs no third-party packages: it uses only the Python standard library
+# and calls an external curl binary (see CURL in tiki_crawler.py and the README).
+#
+# The early scripts in experiments/ used curl_cffi. Uncomment the line below to run them:
+# curl_cffi
