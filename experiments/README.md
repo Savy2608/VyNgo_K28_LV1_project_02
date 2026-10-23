@@ -1,8 +1,8 @@
 # Experiments
 
-Early scripts written while building the crawler, kept to show how the final version in [`../tiki_crawler.py`](../tiki_crawler.py) was reached. They are kept unchanged from when they were written.
+Early scripts written while building the crawler, kept to show how the final version ([`../main.py`](../main.py) and [`../src/`](../src/)) was reached. They are kept unchanged from when they were written.
 
-> These scripts are **not** needed to run the project, and most of them no longer get data from Tiki (see the notes below). Use `tiki_crawler.py` instead. Run them from the repository root so they can find `products-0-200000.csv`.
+> These scripts are **not** needed to run the project, and most of them no longer get data from Tiki (see the notes below). Use `python main.py` instead. Run them from the repository root so they can find `products-0-200000.csv`.
 
 | Order | File | Purpose | What it showed |
 | --- | --- | --- | --- |
@@ -12,12 +12,15 @@ Early scripts written while building the crawler, kept to show how the final ver
 
 ## From the first crawler to the final version
 
-| | `step2_first_crawler.py` | `tiki_crawler.py` |
+| | `step2_first_crawler.py` | Final version (`main.py` + `src/`) |
 | --- | --- | --- |
 | Workers | 4 | 1 ([Bug 6](../docs/bug_report.md#bug-6--parallel-workers-slower-than-one-worker)) |
 | Delay | fixed 0.25 s | adaptive, 0.45–10 s ([Bug 3](../docs/bug_report.md#bug-3--rate-limiting)) |
 | When blocked | pause 60 s, give up after 8 attempts | pause 5–15 min, retry the same ID until it succeeds |
-| Ctrl+C | workers keep running until the batch ends | stops at once ([Bug 7](../docs/bug_report.md#bug-7--ctrlc-did-not-stop-the-worker-threads)) |
+| Ctrl+C | workers keep running until the batch ends | stops within seconds ([Bug 7](../docs/bug_report.md#bug-7--ctrlc-did-not-stop-the-worker-threads)) |
 | Stopped mid-batch | batch lost | finished IDs kept ([Bug 8](../docs/bug_report.md#bug-8--ctrlc-lost-the-batch-in-progress)) |
+| HTTP requests | new `curl` process per request, fixed path | pycurl with connection reuse (curl binary as fallback, found on `PATH`) |
+| Settings | constants in the file | command-line options, environment variables or `.env` |
+| Code layout | one file | `api_client.py`, `parser.py`, `storage.py`, `config.py`, `main.py` |
 
 Note: the docstring of `step2_first_crawler.py` says it uses "the system `curl` command", but the code already calls `/opt/anaconda3/bin/curl`. The difference between the two curl builds is explained in [Bug 4](../docs/bug_report.md#bug-4--two-curl-builds-behave-differently).

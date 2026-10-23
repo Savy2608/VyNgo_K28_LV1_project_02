@@ -12,7 +12,7 @@ Problems found while building and running the crawler: what happened, why, how i
 | 6 | Parallel workers slower than one worker | Fixed (`MAX_WORKERS = 1`) |
 | 7 | Ctrl+C did not stop the worker threads | Fixed |
 | 8 | Ctrl+C lost the batch in progress | Fixed |
-| 9 | Escaped HTML left in descriptions | Open – fix in post-processing after the crawl |
+| 9 | Escaped HTML left in descriptions | Fixed in `src/parser.py`; saved files are re-cleaned after the crawl |
 
 ---
 
@@ -48,16 +48,16 @@ Problems found while building and running the crawler: what happened, why, how i
 - **Symptom:** The same URL returned JSON from one HTTP client and the HTML block page from another.
 - **Cause:** Bot detection looks at how the client connects (TLS/HTTP fingerprint), not only at headers. `requests`, `curl_cffi` (even with `impersonate="chrome"`) and the macOS system curl `/usr/bin/curl` were blocked; the Anaconda build `/opt/anaconda3/bin/curl` was accepted.
 - **How it was found:** Sent the same request with each client and compared the responses.
-- **Fix:** Call `/opt/anaconda3/bin/curl` through `subprocess` with `-A "Mozilla/5.0"`. The path is the `CURL` constant at the top of `tiki_crawler.py`.
+- **Fix:** Use the Anaconda libcurl with a `Mozilla/5.0` user agent. The first version called `/opt/anaconda3/bin/curl` through `subprocess` with a hard-coded path; after code review the crawler uses pycurl (the same libcurl inside Python, with connection reuse), and the curl binary is only a fallback found on `PATH` or given with `--curl-path`.
 - **Lesson:** "It works in my terminal but not in Python" can mean two different programs are being used. Check the exact path of each tool (`which -a curl`).
 
 ## Bug 5 – Settings changed while running have no effect
 
-- **Symptom:** After `MIN_DELAY` and `BLOCK_PAUSE` were changed in `tiki_crawler.py`, the running crawler kept the old behavior.
+- **Symptom:** After `MIN_DELAY` and `BLOCK_PAUSE` were changed in the first version (`tiki_crawler.py`), the running crawler kept the old behavior.
 - **Cause:** Python reads the script once when it starts. Editing the file later does not change the running process.
 - **How it was found:** The pause lengths and delays in the log did not change after the edit.
-- **Fix:** Stop the crawler with Ctrl+C and start it again. Finished work is skipped on restart (see Bug 8).
-- **Lesson:** Settings in code apply only to new runs. Print the settings in use at startup so you can check them; the crawler prints the number of workers and the output folder.
+- **Fix:** Stop the crawler with Ctrl+C and start it again. Finished work is skipped on restart (see Bug 8). Settings are now command-line options or environment variables, so they no longer require editing the code.
+- **Lesson:** Settings in code apply only to new runs. Print the settings in use at startup so you can check them; the crawler prints the workers, transport, delays and output folder.
 
 ## Bug 6 – Parallel workers slower than one worker
 
@@ -91,5 +91,5 @@ Problems found while building and running the crawler: what happened, why, how i
 - **Symptom:** 2 of the first 9,784 saved descriptions still contain tag-like text such as `<span;>` between words of the product text.
 - **Cause:** Some sellers' descriptions contain *escaped* HTML such as `&lt;span;&gt;` (the stray semicolon is in the data). `clean_description()` removes tags with a regex first and calls `html.unescape` afterwards, so `&lt;span;&gt;` only turns into `<span;>` after the regex has already run.
 - **How it was found:** A data quality check on the saved batches searched every description for text that looks like a tag or an entity.
-- **Fix (planned):** Remove tags again after `html.unescape` (or unescape first and then remove tags). The crawl was not changed in the middle, so that all 200 batches are cleaned the same way; the fix will be applied to all saved files in one post-processing step after the crawl.
+- **Fix:** `src/parser.py` now cleans descriptions with Python's `html.parser` in two passes: the first removes tags and decodes entities, the second removes tags that only appeared after decoding. Plain text such as `<3` is kept. Files saved before the fix are cleaned again with `python main.py --reclean` after the crawl.
 - **Lesson:** Check the cleaned data, not only the code. The order of cleaning steps matters when the input can be encoded more than once.
